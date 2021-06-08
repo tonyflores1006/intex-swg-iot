@@ -1,0 +1,335 @@
+/* Hello World Example
+
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
+#include <stdio.h>
+#include <string>
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_spi_flash.h"
+#include "esp_task_wdt.h"
+#include "soc/rtc_wdt.h"
+#include "soc/timer_group_struct.h"
+#include "soc/timer_group_reg.h"
+#include "freertos/portmacro.h"
+#include <soc/rtc.h>
+#include "esp_event.h"
+#include "nvs_flash.h"
+#include "driver/gpio.h"
+#include "driver/uart.h"
+#include "driver/timer.h"
+#include "esp32/rom/uart.h"
+//#include "wifi_manager.h"
+#include "IntexSWG.h"
+#include "TM1650.h"
+#include "utils.h"
+#include <inttypes.h>
+
+// DIO=18, CLK=19, Digits=2, ActivateDisplay=true, Intensity=3, DisplayMode=4x8
+TM1650 module(dataDispPin, clockDispPin, 2, true, 3, TM1650_DISPMODE_4x8);
+
+TaskHandle_t xHandle1;
+TaskHandle_t TaskA;
+
+volatile bool displayON = true;
+volatile uint8_t displayIntensity = 3; // (range 0-7)
+volatile bool sendingKeyCode = false;
+volatile bool keyCodeSetByAPI = false;
+volatile uint8_t buttonStatus = 0x2E;
+volatile uint8_t prevButtonStatus = 0x00;
+volatile uint8_t dataReceived[2];
+volatile uint8_t statusDigit1;
+volatile uint8_t statusDigit2;
+volatile uint8_t statusDigit3;
+volatile uint32_t checkpoint=0;
+
+volatile uint8_t dataReceivedBuffer[256];
+int totalbytes = 0;
+
+
+void feedTheDog(){
+    // feed dog 0
+    TIMERG0.wdt_wprotect=TIMG_WDT_WKEY_VALUE; // write enable
+    TIMERG0.wdt_feed=1;                       // feed dog
+    TIMERG0.wdt_wprotect=0;                   // write protect
+    // feed dog 1
+    TIMERG1.wdt_wprotect=TIMG_WDT_WKEY_VALUE; // write enable
+    TIMERG1.wdt_feed=1;                       // feed dog
+    TIMERG1.wdt_wprotect=0;                   // write protect
+}
+
+void IRAM_ATTR Core1( void* p) {
+    vTaskDelay(1000);
+    
+    // I do not want an RTOS-Tick here
+    portDISABLE_INTERRUPTS();  // YEAH
+    
+    register int sdaValue, sclValue, prevSda = 0, prevScl = 0, totalClocks = 0, totalBitsSent = 0;
+    bool receivingData = false,  bytePosition = false, dataOutput = false, sendingACK = false;
+    uint8_t receivedByte = 0;  
+    
+    sdaValue = prevSda = GPIO_IN_Get(dataPin);
+    prevScl = GPIO_IN_Get(clockPin);
+
+    while(1) {
+        if (dataOutput == false && sendingACK == false) {
+            sdaValue = GPIO_IN_Get(dataPin);
+        }
+        sclValue = GPIO_IN_Get(clockPin);       
+                                                                // the superloop 
+            // STOP Condition
+            if (prevSda == LOW && sdaValue == HIGH && sclValue == HIGH) {
+                receivingData = false;
+                sendingKeyCode = false;
+                totalClocks = 0;
+                receivedByte = 0;
+       /*        
+                feedTheDog();
+                vTaskDelay(5);
+                feedTheDog();
+                vTaskDelay(5);                
+       */         //delayMicroseconds(1000);
+            }
+
+            // Detect CLK RISING (0 -> 1)
+            else if (prevScl == LOW && sclValue == HIGH) {
+                // RECEIVING DATA
+                if (receivingData) {                    
+                    if (totalClocks < 8) {
+                        // Read SDA bit
+                        receivedByte <<= 1;   // MSB first on TM1650, so shift left                            
+                        if (sdaValue == HIGH) {
+                            receivedByte |= 1;	// MSB first on TM1650, so set lowest bit
+                        }
+                        // Send ACK
+                        if (totalClocks == 7) {
+                            delayMicroseconds(5);
+                            digitalWrite(dataPin, LOW);
+                            pinMode(dataPin, GPIO_MODE_OUTPUT);
+                            delayMicroseconds(1);
+                            sendingACK = true;
+                        }                        
+                        totalClocks++;
+                    }
+                    // Save/Process received byte
+                    else {                      
+                        dataReceived[(int)bytePosition] = receivedByte;                                                        
+
+                        // Check if we have received both bytes
+                        if (bytePosition) {
+                            switch (dataReceived[0])
+                            {
+                            case 0x68:
+                                statusDigit1 = dataReceived[1];
+                                break;
+                            case 0x6A:
+                                statusDigit2 = dataReceived[1];
+                                break;
+                            case 0x6C:
+                                statusDigit3 = dataReceived[1];
+                                break;                            
+                            default:
+                                break;
+                            }
+                        } 
+                        else {
+                            // Read Keyboard code received
+                            if (dataReceived[0] == 0x4F) {
+                                sendingKeyCode = true;
+                                receivingData = false;
+                                bytePosition = !bytePosition;
+                            }
+                        }               
+                        receivedByte = 0;
+                        totalClocks = 0;
+                        bytePosition = !bytePosition;
+                    }
+                }            
+            }
+
+            // Detect CLK FALLING (1 -> 0)
+            else if (prevScl == HIGH && sclValue == LOW) {
+                if (sendingACK && totalClocks == 0) {
+                    if (sendingKeyCode == false) {
+                        // Release SDA, Stop Send ACK 
+                        delayMicroseconds(3);
+                        pinMode(dataPin, GPIO_MODE_INPUT);
+                        digitalWrite(dataPin, HIGH);
+                        //delayMicroseconds(3);
+                        sendingACK = false;
+                    } else {
+                        dataOutput = true;
+                        receivingData = false;
+                    }
+                }
+
+                // SEND KEY CODE (Master request to read keys with command 0x4F)
+                if (sendingKeyCode) {                  
+                    if (totalBitsSent < 8) {                    
+                        digitalWrite(dataPin, (buttonStatus << totalBitsSent) & 0x80 ? HIGH : LOW);
+                        delayMicroseconds(1);
+                        totalBitsSent++;
+                    }
+                    else {
+                        // Receive ACK
+                        delayMicroseconds(3); // MEDIDO
+                        pinMode(dataPin, GPIO_MODE_INPUT);                        
+                        digitalWrite(dataPin, HIGH);
+                        delayMicroseconds(3); // 12us?
+                        
+
+                        dataOutput = false;
+                        sendingKeyCode = false;
+                        receivingData = true;
+                        totalBitsSent = 0;
+                    }
+                }
+            }
+
+            // START Condition
+            else if (prevSda == HIGH && sdaValue == LOW && sclValue == HIGH) {
+                receivingData = true;            
+            }
+           if (dataOutput == false) {
+                prevSda = sdaValue;            
+           }        
+        prevScl = sclValue;        
+        
+        feedTheDog();   
+    }
+    //vTaskDelete(NULL);
+}
+
+
+/*------------------------------------------------------------------
+RTOS1:
+This task prints the counted "pin change interrupts" to terminal
+once a second and saves the value for the WebServer
+------------------------------------------------------------------*/
+void RTOS_1(void *p) {
+
+    vTaskDelay(1000);
+    uint32_t prevCheckpoint = 0;
+
+    while(1) { 
+        buttonStatus = module.getButtonPressedCode();
+        module.setupDisplay(displayON, displayIntensity);
+        module.setSegments(statusDigit1, (DIGIT1 & 0b111) >> 1);
+        
+        vTaskDelay(10);
+        
+        buttonStatus = module.getButtonPressedCode();
+        module.setupDisplay(displayON, displayIntensity);
+        module.setSegments(statusDigit2, (DIGIT2 & 0b111) >> 1);
+        
+        vTaskDelay(10);
+        
+        buttonStatus = module.getButtonPressedCode();
+        module.setupDisplay(displayON, displayIntensity);
+        module.setSegments(statusDigit3, (DIGIT3 & 0b111) >> 1);
+
+        taskYIELD();
+
+        if (prevCheckpoint != checkpoint) {
+            prevCheckpoint = checkpoint;
+            printf("Checkpoint: %d\n", checkpoint);
+        }
+
+        //printf("DIG1: 0x%02X - DIG2:0x%02X - DIG3: 0x%02X\n", statusDigit1, statusDigit2, statusDigit3);
+/*        
+        if (totalbytes >= 100) {
+            totalbytes = 0;
+            for (int i=0 ; i<100 ; i++) {
+                printf("0x%02X\n", dataReceivedBuffer[i]);
+            }
+        }
+*/
+        //printf("key: 0x%02X\n", buttonStatus);
+        vTaskDelay(10);
+    }
+}
+
+
+
+void startCore0(void) {
+    xTaskCreatePinnedToCore(
+        RTOS_1,                 // Function that implements the task.
+        "RTOS-1",               // Text name for the task.
+        STACK_SIZE,             // Stack size in bytes, not words.
+        ( void * ) 1,           // Parameter passed into the task.
+        tskIDLE_PRIORITY + 3,   // Priority
+        &xHandle1,              // Variable to hold the task's data structure.
+        0);
+}
+
+// Function that creates the superloop Core1 to be pinned at Core 1
+void startCore1( void )
+{
+    xTaskCreatePinnedToCore(
+        Core1,                  // Function that implements the task.
+        "Core1",                // Text name for the task.
+        10000,             // Stack size in bytes, not words.
+        ( void * ) 1,           // Parameter passed into the task.
+        tskIDLE_PRIORITY + 3,   // Priority
+        &TaskA,                 // Task
+        1);                     // Core 1
+}
+
+extern "C" void app_main(void)
+{
+    printf("Hello world!\n");
+
+    /* Print chip information */
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    printf("This is %s chip with %d CPU cores, WiFi%s%s, ",
+            CONFIG_IDF_TARGET,
+            chip_info.cores,
+            (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
+            (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
+
+    printf("silicon revision %d, ", chip_info.revision);
+
+    printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
+    printf("Free heap: %d\n", esp_get_free_heap_size());
+
+/*
+    uint64_t time1=0;
+    uint64_t time2=0;
+    time1 = millis();
+    vTaskDelay(1000);
+    time2 = millis();
+    printf("Delta time %" PRId64 "\n", (time2-time1));
+*/
+
+/*
+    for (int i = 10; i >= 0; i--) {
+        printf("Restarting in %d seconds...\n", i);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    printf("Restarting now.\n");
+    fflush(stdout);
+    esp_restart();
+*/
+    pinMode(dataPin, GPIO_MODE_INPUT);
+    GPIO_Set(dataPin);
+
+    pinMode(clockPin, GPIO_MODE_INPUT);
+    GPIO_Set(clockPin);
+
+    pinMode(dataDispPin, GPIO_MODE_OUTPUT);
+    pinMode(clockDispPin, GPIO_MODE_OUTPUT); 
+
+    //module.setupDisplay(true, 5);   // on=true, intensity-2 (range 0-7)
+
+    startCore0();
+    startCore1();
+}
