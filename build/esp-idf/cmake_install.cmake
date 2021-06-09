@@ -108,6 +108,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("C:/Users/flores.WFS/Documents/PlatformIO/Projects/IntexSWG_IDF/build/esp-idf/unity/cmake_install.cmake")
   include("C:/Users/flores.WFS/Documents/PlatformIO/Projects/IntexSWG_IDF/build/esp-idf/wifi_provisioning/cmake_install.cmake")
   include("C:/Users/flores.WFS/Documents/PlatformIO/Projects/IntexSWG_IDF/build/esp-idf/main/cmake_install.cmake")
+  include("C:/Users/flores.WFS/Documents/PlatformIO/Projects/IntexSWG_IDF/build/esp-idf/esp-aws-iot/cmake_install.cmake")
   include("C:/Users/flores.WFS/Documents/PlatformIO/Projects/IntexSWG_IDF/build/esp-idf/esp32-wifi-manager/cmake_install.cmake")
 
 endif()

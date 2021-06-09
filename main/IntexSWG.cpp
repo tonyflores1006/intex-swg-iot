@@ -39,6 +39,7 @@
 #include "IntexSWG.h"
 #include "TM1650.h"
 #include "utils.h"
+#include "app_priv.h"
 
 
 // DIO=18, CLK=19, Digits=2, ActivateDisplay=true, Intensity=3, DisplayMode=4x8
@@ -258,15 +259,20 @@ void IRAM_ATTR Core1( void* p) {
 /**
  * @brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event.
  */
-//void cb_connection_ok(void *pvParameter){
-//	ip_event_got_ip_t* param = (ip_event_got_ip_t*)pvParameter;
+void cb_connection_ok(void *pvParameter){
+	ip_event_got_ip_t* param = (ip_event_got_ip_t*)pvParameter;
 
 	/* transform IP to human readable string */
-//	char str_ip[16];
-//	esp_ip4addr_ntoa(&param->ip_info.ip, str_ip, IP4ADDR_STRLEN_MAX);
+	char str_ip[16];
+	esp_ip4addr_ntoa(&param->ip_info.ip, str_ip, IP4ADDR_STRLEN_MAX);
 
-//	ESP_LOGI(TAG, "I have a connection and my IP is %s!", str_ip);
-//}
+	ESP_LOGI(TAG, "I have a connection and my IP is %s!", str_ip);
+
+    start_rest_server(8080);
+
+    //cloud_start();
+    
+}
 
 
 /**
@@ -580,7 +586,7 @@ extern "C" void app_main(void)
     //wifi_manager_clear_wifi_configuration();
 
 	/* register a callback as an example to how you can integrate your code with the wifi manager */
-	//wifi_manager_set_callback(WM_EVENT_STA_GOT_IP, &cb_connection_ok);    
+	wifi_manager_set_callback(WM_EVENT_STA_GOT_IP, &cb_connection_ok);    
 
 	/* your code should go here. Here we simply create a task on core 2 that monitors free heap memory */
 	//xTaskCreatePinnedToCore(&monitoring_task, "monitoring_task", 2048, NULL, 1, NULL, 0);
@@ -596,8 +602,7 @@ extern "C" void app_main(void)
    
    if (wifi_manager_fetch_wifi_sta_config())
     {
-        startCore1();
-        start_rest_server(8080);
+        startCore1();        
     }
     else {
         wifi_manager_set_callback(WM_EVENT_WIFI_CONFIG_SAVED, &reset_esp);

@@ -1406,6 +1406,26 @@ rule CXX_STATIC_LIBRARY_LINKER____idf_wifi_provisioning
 
 
 #############################################
+# Rule for compiling ASM files.
+
+rule ASM_COMPILER____idf_main
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ccache C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building ASM object $out
+
+
+#############################################
+# Rule for compiling C files.
+
+rule C_COMPILER____idf_main
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ccache C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
+  description = Building C object $out
+
+
+#############################################
 # Rule for compiling CXX files.
 
 rule CXX_COMPILER____idf_main
@@ -1419,6 +1439,25 @@ rule CXX_COMPILER____idf_main
 # Rule for linking CXX static library.
 
 rule CXX_STATIC_LIBRARY_LINKER____idf_main
+  command = cmd.exe /C "$PRE_LINK && C:\Users\flores.WFS\.espressif\tools\cmake\3.16.4\bin\cmake.exe -E remove $TARGET_FILE && C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-ar.exe qc $TARGET_FILE $LINK_FLAGS $in && C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-ranlib.exe $TARGET_FILE && $POST_BUILD"
+  description = Linking CXX static library $TARGET_FILE
+  restat = $RESTAT
+
+
+#############################################
+# Rule for compiling C files.
+
+rule C_COMPILER____idf_esp-aws-iot
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ccache C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out   -c $in
+  description = Building C object $out
+
+
+#############################################
+# Rule for linking CXX static library.
+
+rule CXX_STATIC_LIBRARY_LINKER____idf_esp-aws-iot
   command = cmd.exe /C "$PRE_LINK && C:\Users\flores.WFS\.espressif\tools\cmake\3.16.4\bin\cmake.exe -E remove $TARGET_FILE && C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-ar.exe qc $TARGET_FILE $LINK_FLAGS $in && C:\Users\flores.WFS\.espressif\tools\xtensa-esp32-elf\esp-2020r3-8.4.0\xtensa-esp32-elf\bin\xtensa-esp32-elf-ranlib.exe $TARGET_FILE && $POST_BUILD"
   description = Linking CXX static library $TARGET_FILE
   restat = $RESTAT

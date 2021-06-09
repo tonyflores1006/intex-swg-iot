@@ -15668,6 +15668,216 @@
                     {
                         "children": [],
                         "depends_on": null,
+                        "help": "Default endpoint host name to connect to AWS IoT MQTT/S gateway\n\nThis is the custom endpoint hostname and is specific to an AWS\nIoT account. You can find it by logging into your AWS IoT\nConsole and clicking the Settings button. The endpoint hostname\nis shown under the \"Custom Endpoint\" heading on this page.\n\nIf you need per-device hostnames for different regions or\naccounts, you can override the default hostname in your app.",
+                        "id": "AWS_IOT_MQTT_HOST",
+                        "name": "AWS_IOT_MQTT_HOST",
+                        "range": null,
+                        "title": "AWS IoT Endpoint Hostname",
+                        "type": "string"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Default port number to connect to AWS IoT MQTT/S gateway\n\nIf you need per-device port numbers for different regions, you can\noverride the default port number in your app.",
+                        "id": "AWS_IOT_MQTT_PORT",
+                        "name": "AWS_IOT_MQTT_PORT",
+                        "range": [
+                            0,
+                            65535
+                        ],
+                        "title": "AWS IoT MQTT Port",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Maximum MQTT transmit buffer size. This is the maximum MQTT\nmessage length (including protocol overhead) which can be sent.\n\nSending longer messages will fail.",
+                        "id": "AWS_IOT_MQTT_TX_BUF_LEN",
+                        "name": "AWS_IOT_MQTT_TX_BUF_LEN",
+                        "range": [
+                            32,
+                            131072
+                        ],
+                        "title": "MQTT TX Buffer Length",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Maximum MQTT receive buffer size. This is the maximum MQTT\nmessage length (including protocol overhead) which can be\nreceived.\n\nLonger messages are dropped.",
+                        "id": "AWS_IOT_MQTT_RX_BUF_LEN",
+                        "name": "AWS_IOT_MQTT_RX_BUF_LEN",
+                        "range": [
+                            32,
+                            131072
+                        ],
+                        "title": "MQTT RX Buffer Length",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Maximum number of concurrent MQTT topic filters.",
+                        "id": "AWS_IOT_MQTT_NUM_SUBSCRIBE_HANDLERS",
+                        "name": "AWS_IOT_MQTT_NUM_SUBSCRIBE_HANDLERS",
+                        "range": [
+                            1,
+                            100
+                        ],
+                        "title": "Maximum MQTT Topic Filters",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Initial delay before making first reconnect attempt, if the AWS IoT connection fails.\nClient will perform exponential backoff, starting from this value.",
+                        "id": "AWS_IOT_MQTT_MIN_RECONNECT_WAIT_INTERVAL",
+                        "name": "AWS_IOT_MQTT_MIN_RECONNECT_WAIT_INTERVAL",
+                        "range": [
+                            10,
+                            3600000
+                        ],
+                        "title": "Auto reconnect initial interval (ms)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Maximum delay between reconnection attempts. If the exponentially increased delay\ninterval reaches this value, the client will stop automatically attempting to reconnect.",
+                        "id": "AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL",
+                        "name": "AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL",
+                        "range": [
+                            10,
+                            3600000
+                        ],
+                        "title": "Auto reconnect maximum interval (ms)",
+                        "type": "int"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": "ATCA_MBEDTLS_ECDSA",
+                        "help": "Enable this option to use the hardware secure element for the TLS. If you have added the\nesp-cryptoauthlib (https://github.com/espressif/esp-cryptoauthlib) as a component in your project.\nThis will let the user to specify a slot number from the chip (in the format \"#0\"\nwhere the digit is the slot number to use) which contains the stored private key.\nPlease refer to the component README for more details.",
+                        "id": "AWS_IOT_USE_HARDWARE_SECURE_ELEMENT",
+                        "name": "AWS_IOT_USE_HARDWARE_SECURE_ELEMENT",
+                        "range": null,
+                        "title": "Use the hardware secure element for authenticating TLS connections",
+                        "type": "bool"
+                    },
+                    {
+                        "children": [
+                            {
+                                "children": [
+                                    {
+                                        "children": [],
+                                        "depends_on": "AWS_IOT_OVERRIDE_THING_SHADOW_RX_BUFFER",
+                                        "help": "Allows setting a different Thing Shadow RX buffer size.\nThis is the maximum size of a Thing Shadow message in bytes,\nplus one.",
+                                        "id": "AWS_IOT_SHADOW_MAX_SIZE_OF_RX_BUFFER",
+                                        "name": "AWS_IOT_SHADOW_MAX_SIZE_OF_RX_BUFFER",
+                                        "range": null,
+                                        "title": "Maximum RX Buffer (bytes)",
+                                        "type": "int"
+                                    }
+                                ],
+                                "depends_on": null,
+                                "help": "Allows setting a different Thing Shadow RX buffer\nsize. This is the maximum size of a Thing Shadow\nmessage in bytes, plus one.\n\nIf not overridden, the default value is the MQTT RX Buffer length plus one. If overriden, do not set\nhigher than the default value.",
+                                "id": "AWS_IOT_OVERRIDE_THING_SHADOW_RX_BUFFER",
+                                "name": "AWS_IOT_OVERRIDE_THING_SHADOW_RX_BUFFER",
+                                "range": null,
+                                "title": "Override Shadow RX buffer size",
+                                "type": "bool"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": "Maximum size of the Unique Client Id.",
+                                "id": "AWS_IOT_SHADOW_MAX_SIZE_OF_UNIQUE_CLIENT_ID_BYTES",
+                                "name": "AWS_IOT_SHADOW_MAX_SIZE_OF_UNIQUE_CLIENT_ID_BYTES",
+                                "range": [
+                                    4,
+                                    1000
+                                ],
+                                "title": "Maximum unique client ID size (bytes)",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": "At any given time we will wait for this many responses. This will correlate to the rate at which the\nshadow actions are requested",
+                                "id": "AWS_IOT_SHADOW_MAX_SIMULTANEOUS_ACKS",
+                                "name": "AWS_IOT_SHADOW_MAX_SIMULTANEOUS_ACKS",
+                                "range": [
+                                    1,
+                                    100
+                                ],
+                                "title": "Maximum simultaneous responses",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": "We could perform shadow action on any thing Name and this is maximum Thing Names we can act on at any\ngiven time",
+                                "id": "AWS_IOT_SHADOW_MAX_SIMULTANEOUS_THINGNAMES",
+                                "name": "AWS_IOT_SHADOW_MAX_SIMULTANEOUS_THINGNAMES",
+                                "range": [
+                                    1,
+                                    100
+                                ],
+                                "title": "Maximum simultaneous Thing Name operations",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": "These are the max tokens that is expected to be in the Shadow JSON document. Includes the metadata which\nis published",
+                                "id": "AWS_IOT_SHADOW_MAX_JSON_TOKEN_EXPECTED",
+                                "name": "AWS_IOT_SHADOW_MAX_JSON_TOKEN_EXPECTED",
+                                "range": null,
+                                "title": "Maximum expected JSON tokens",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": "All shadow actions have to be published or subscribed to a topic which is of the format\n$aws/things/{thingName}/shadow/update/accepted. This refers to the size of the topic without the Thing\nName",
+                                "id": "AWS_IOT_SHADOW_MAX_SHADOW_TOPIC_LENGTH_WITHOUT_THINGNAME",
+                                "name": "AWS_IOT_SHADOW_MAX_SHADOW_TOPIC_LENGTH_WITHOUT_THINGNAME",
+                                "range": [
+                                    10,
+                                    1000
+                                ],
+                                "title": "Maximum topic length (not including Thing Name)",
+                                "type": "int"
+                            },
+                            {
+                                "children": [],
+                                "depends_on": null,
+                                "help": "Maximum length of a Thing Name.",
+                                "id": "AWS_IOT_SHADOW_MAX_SIZE_OF_THING_NAME",
+                                "name": "AWS_IOT_SHADOW_MAX_SIZE_OF_THING_NAME",
+                                "range": [
+                                    4,
+                                    1000
+                                ],
+                                "title": "Maximum Thing Name length",
+                                "type": "int"
+                            }
+                        ],
+                        "depends_on": null,
+                        "id": "component-config-amazon-web-services-iot-platform-thing-shadow",
+                        "title": "Thing Shadow",
+                        "type": "menu"
+                    }
+                ],
+                "depends_on": null,
+                "id": "component-config-amazon-web-services-iot-platform",
+                "title": "Amazon Web Services IoT Platform",
+                "type": "menu"
+            },
+            {
+                "children": [
+                    {
+                        "children": [],
+                        "depends_on": null,
                         "help": "Tasks spawn by the manager will have a priority of WIFI_MANAGER_TASK_PRIORITY-1. For this particular reason, minimum recommended task priority is 2.",
                         "id": "WIFI_MANAGER_TASK_PRIORITY",
                         "name": "WIFI_MANAGER_TASK_PRIORITY",

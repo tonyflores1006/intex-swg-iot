@@ -1,0 +1,1 @@
+arn:aws:iot:eu-west-3:215589067239:thing/IntexSWG
