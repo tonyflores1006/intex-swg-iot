@@ -36,6 +36,7 @@
 #include <inttypes.h>
 
 #include "RestServer.h"
+//#include "OTAServer.h"
 #include "IntexSWG.h"
 #include "TM1650.h"
 #include "utils.h"
@@ -66,7 +67,9 @@ volatile uint8_t displayingDigit1;
 volatile uint8_t displayingDigit2;
 volatile uint8_t powerStatus;
 volatile bool displayBlinking;
-volatile bool removeWifiConfig;
+volatile bool removeWifiConfig = false;
+volatile bool otaUpdating = false;
+volatile uint8_t selfCleanTime = 10;
 
 volatile uint16_t virtualPressButtonTime = 250;
 volatile uint32_t checkpoint=0;
@@ -89,6 +92,10 @@ char getDisplayDigitFromCode(uint8_t code) {
         case DISP_8: return '8';
         case DISP_9: return '9';
         case DISP_DP: return '.';
+        case DISP_1_CLEAN_06P: return '6';
+        case DISP_1_CLEAN_10P: return '0';
+        case DISP_1_CLEAN_14P: return '4';
+
         default: return 0;
     }
 }
@@ -135,6 +142,15 @@ void IRAM_ATTR Core1( void* p) {
     prevScl = GPIO_IN_Get(clockPin);
 
     while(1) {
+        if (otaUpdating || removeWifiConfig) {
+            portENABLE_INTERRUPTS();
+            while (otaUpdating || removeWifiConfig) {
+                feedTheDog();
+            }
+            delayMicroseconds(2000000);
+            portDISABLE_INTERRUPTS();
+        }
+
         if (!dataOutput && !sendingACK) {
             sdaValue = GPIO_IN_Get(dataPin);
         }
@@ -258,15 +274,15 @@ void IRAM_ATTR Core1( void* p) {
 /**
  * @brief this is an exemple of a callback that you can setup in your own app to get notified of wifi manager event.
  */
-//void cb_connection_ok(void *pvParameter){
-//	ip_event_got_ip_t* param = (ip_event_got_ip_t*)pvParameter;
+void cb_connection_ok(void *pvParameter){
+	//ip_event_got_ip_t* param = (ip_event_got_ip_t*)pvParameter;
 
 	/* transform IP to human readable string */
-//	char str_ip[16];
-//	esp_ip4addr_ntoa(&param->ip_info.ip, str_ip, IP4ADDR_STRLEN_MAX);
+	//char str_ip[16];
+	//esp_ip4addr_ntoa(&param->ip_info.ip, str_ip, IP4ADDR_STRLEN_MAX);
 
-//	ESP_LOGI(TAG, "I have a connection and my IP is %s!", str_ip);
-//}
+	//ESP_LOGI(TAG, "I have a connection and my IP is %s!", str_ip);    
+}
 
 
 /**
@@ -297,6 +313,8 @@ void reset_esp(void *pvParameter){
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         feedTheDog();
     }
+    otaUpdating = false;
+    removeWifiConfig = false;
     printf("Restarting now.\n");
     fflush(stdout);
     esp_restart();
@@ -350,6 +368,39 @@ void RTOS_1(void *p) {
     }
 }
 
+
+void select_self_clean_period() {
+    unsigned long time1;
+    unsigned long time2;
+    time1 = time2 = millis();
+    if (selfCleanTime != displayingDigit1) {
+        buttonStatus = 0x00;
+        ESP_LOGI(TAG, "selfCleanTime = 0x%02X / displayingDigit1 = 0x%02X", selfCleanTime, displayingDigit1);
+        while(selfCleanTime != displayingDigit1) {
+            displayingDigit1 = (statusDigit2 > 0x00) ? statusDigit1 : displayingDigit1;
+            if (time2 - time1 > 250) {
+                buttonStatus = (buttonStatus == 0x00) ? BUTTON_SELF_CLEAN : 0x00;                
+                time1 = time2 = millis();
+            } 
+            else {
+                time2 = millis();
+            }
+        }
+    }
+}
+
+void press_lock_button() {
+    unsigned long time1;
+    unsigned long time2;
+    time1 = time2 = millis();    
+    buttonStatus = BUTTON_LOCK;
+    while(time2 - time1 < 250) {
+        time2 = millis();            
+    }
+    buttonStatus = 0x00;    
+}
+
+
 /**
  * @brief Task that controls virtual key press (API), power status info and display information to be retrieved by API
  */
@@ -373,27 +424,11 @@ void RTOS_2(void *p) {
     powerBlinks = 0;
 
     while(1) { 
-        if (removeWifiConfig) {
-            removeWifiConfig = false;
+        if (removeWifiConfig) {            
             wifi_manager_clear_wifi_configuration();
+            reset_esp(NULL);
         }
         
-        // Keep API keycode for 250ms (Virtual Press Button) **************************************
-        if (keyCodeSetByAPI) {
-            // Start counting time
-            if (time1_keycode_api == 0 && time2_keycode_api == 0) {
-                time1_keycode_api = time2_keycode_api = millis();
-            }
-            if (time2_keycode_api - time1_keycode_api > virtualPressButtonTime) {
-                keyCodeSetByAPI = false;
-                time1_keycode_api = time2_keycode_api = 0;
-            } 
-            else {
-                time2_keycode_api = millis();
-            }
-        }
-        // Keep API keycode for 250ms (Virtual Press Button) **************************************
-
         // Check and update Power status ***********************************************************
         if (time2_power - time1_power < 1500) {        
             statusPowerLed = (statusDigit3 & (0x01 << LED_POWER)) >> LED_POWER == 1 ? true : false;
@@ -427,11 +462,34 @@ void RTOS_2(void *p) {
             time1_displ = time2_displ = millis();
         }
         // Check and update Display status ***********************************************************
+
+        // Keep API keycode for ms (Virtual Press Button defined in virtualPressButtonTime) ********
+        if (keyCodeSetByAPI) {
+            // Start counting time
+            if (time1_keycode_api == 0 && time2_keycode_api == 0) {
+                time1_keycode_api = time2_keycode_api = millis();
+            }
+            if (time2_keycode_api - time1_keycode_api > virtualPressButtonTime) {
+                // Self cleaning macro
+                if (buttonStatus == BUTTON_SELF_CLEAN) {
+                    select_self_clean_period();
+                    press_lock_button();
+                }
+                // TODO: Manage programming macro
+                keyCodeSetByAPI = false;
+                time1_keycode_api = time2_keycode_api = 0;
+            } 
+            else {
+                time2_keycode_api = millis();
+            }
+        }
+        // Keep API keycode for ms (Virtual Press Button defined in virtualPressButtonTime) ********
         
         taskYIELD();
     }
 }
 
+// TODO: Show load percentatge of OTA in display before reboot
 
 /**
  * @brief Show blinking "AP" in the display while waiting for wifi configuration
@@ -551,6 +609,7 @@ extern "C" void app_main(void)
     esp_restart();
 */
 
+/*
     uint32_t clocks1=0;
     uint32_t clocks2=0;
     uint32_t clocks3=0;
@@ -561,7 +620,7 @@ extern "C" void app_main(void)
     pinMode(dataPin, GPIO_MODE_INPUT);
     clocks3 = clocks();
     printf("IN->OUT: %d clocks - OUT->IN: %d clocks\n", (clocks2-clocks1), (clocks3-clocks2));
-
+*/
 
     pinMode(dataPin, GPIO_MODE_INPUT);
     GPIO_Set(dataPin);
@@ -591,13 +650,19 @@ extern "C" void app_main(void)
     }
     */
 
+   //printf("So cool v3!\n");
+
     startCore0a();
     startCore0b();
    
    if (wifi_manager_fetch_wifi_sta_config())
     {
+        //wifi_manager_set_callback(WM_EVENT_WIFI_CONFIG_CLEARED, &reset_esp);
         startCore1();
+        //xTaskCreate(&systemRebootTask, "rebootTask", 2048, NULL, 5, NULL);
+        xTaskCreatePinnedToCore(&systemRebootTask, "rebootTask", 2048, NULL, 5, NULL, 0);
         start_rest_server(8080);
+        //start_OTA_webserver(8088);
     }
     else {
         wifi_manager_set_callback(WM_EVENT_WIFI_CONFIG_SAVED, &reset_esp);

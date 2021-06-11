@@ -38,6 +38,10 @@
 #define DISP_DP     0b00000010
 #define DISP_A      0b10111101
 #define DISP_P      0b10111100
+#define DISP_1_CLEAN_06P 0b11110111
+#define DISP_1_CLEAN_10P 0b11011111
+#define DISP_1_CLEAN_14P 0b00111011
+
 
 #define LED_OZONE           0   // 0b00000001
 #define LED_SLEEP           1   // 0b00000010
@@ -81,6 +85,8 @@ extern volatile uint8_t powerStatus;
 extern volatile uint16_t virtualPressButtonTime;
 extern volatile bool displayBlinking;
 extern volatile bool removeWifiConfig;
+extern volatile bool otaUpdating;
+extern volatile uint8_t selfCleanTime;
 
 //const std::string hostname = "INTEX-SWG";
 
