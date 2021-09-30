@@ -1,6 +1,10 @@
 #ifndef IntexSWG_h
 #define IntexSWG_h
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define STACK_SIZE 4096
 
 #define CLOCKS_1_ns 240
@@ -16,12 +20,12 @@
 #define CLOCKS_4_us 959923
 #define CLOCKS_5_us 1199904
 
-#define clockTestPin GPIO_NUM_22
-#define dataTestPin GPIO_NUM_21
-#define clockPin GPIO_NUM_17
-#define dataPin GPIO_NUM_16
-#define clockDispPin GPIO_NUM_19
-#define dataDispPin GPIO_NUM_18
+
+#define clockPin        GPIO_NUM_19
+#define dataPin         GPIO_NUM_18
+#define clockDispPin    GPIO_NUM_17
+#define dataDispPin     GPIO_NUM_16
+#define powerRelayPin   GPIO_NUM_0
 
 // Segment-bit: E D G F B A DP C
 #define DISP_BLANK  0b00000000
@@ -47,7 +51,7 @@
 #define LED_SLEEP           1   // 0b00000010
 #define LED_BOOST           2   // 0b00000100
 #define LED_POWER           3   // 0b00001000
-#define LED_PUMP_LOW_FLOW   4   // 0b00010000
+#define LED_PUMP_LOW_FLOW   4   // 0b00010000 12???
 #define LED_LOW_SALT        5   // 0b00100000
 #define LED_HIGH_SALT       6   // 0b01000000
 #define LED_SERVICE         7   // 0b10000000
@@ -56,9 +60,11 @@
 #define RIGHT_DIGIT 0
 #define STATUS_LEDS 2
 
-#define POWER_STATUS_STANDBY    0
-#define POWER_STATUS_ON         1
-#define POWER_STATUS_BOOTING    2
+#define POWER_STATUS_OFF        0
+#define POWER_STATUS_STANDBY    1
+#define POWER_STATUS_ON         2
+#define POWER_STATUS_BOOTING    3
+#define POWER_STATUS_BUS_ERROR  4
 
 #define DIGIT1              0x68
 #define DIGIT2              0x6A
@@ -71,9 +77,12 @@
 #define BUTTON_SELF_CLEAN   0x74
 
 extern volatile bool displayON;
+extern volatile bool machineON;
 extern volatile uint8_t displayIntensity; // (range 0-7)
 extern volatile uint8_t statusLedsIntensity; // (range 0-7)
+extern volatile bool sendingKeyCode;
 extern volatile uint8_t buttonStatus;
+extern volatile uint8_t nextButtonStatus;
 extern volatile uint8_t prevButtonStatus;
 extern volatile bool keyCodeSetByAPI;
 extern volatile uint8_t statusDigit1;
@@ -86,27 +95,23 @@ extern volatile uint16_t virtualPressButtonTime;
 extern volatile bool displayBlinking;
 extern volatile bool removeWifiConfig;
 extern volatile bool otaUpdating;
+extern volatile bool wifiReconnecting;
+extern volatile bool delayedPowerOff;
+extern volatile bool readingMaster;
 extern volatile uint8_t selfCleanTime;
+
+extern volatile uint8_t dataReceivedBuffer[128][2];
 
 //const std::string hostname = "INTEX-SWG";
 
 
 char getDisplayDigitFromCode(uint8_t code);
+uint8_t getCodeFromDisplayDigit(char displayDigit);
+void IRAM_ATTR machinePower(bool powerON);
 
-/*
-std::string getStatusDigitFromCode(uint8_t code) {
-    switch (code) {
-        case LED_OZONE: return "O3 GENERATION";      
-        case LED_SLEEP: return "SLEEP";
-        case LED_BOOST: return "BOOST";     
-        case LED_POWER: return "WORKING";    
-        case LED_PUMP_LOW_FLOW: return "PUMP LOW FLOW";    
-        case LED_LOW_SALT: return "LOW SALT";
-        case LED_HIGH_SALT: return "HIGH SALT";
-        case LED_SERVICE: return "SERVICE";
-        default: return "";                   
-    }
+
+#ifdef __cplusplus
 }
-*/
-
 #endif
+
+#endif //IntexSWG_h

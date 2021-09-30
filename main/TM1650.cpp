@@ -208,8 +208,8 @@ uint8_t TM1650::getButtonPressedCode()
 	// Testing shows return value is below 0x44 when no button is pressed.
 	// The return value is 0x04 after button 0x44 was released or 0x0C after button 0x4C was released.
 	// Testing also shows return value is 0x2E after first powerup (when no buttons were pressed). It changes to 0x0C after button 0x4C was released.
-	if(received<0x44)
-		return(0);
+	//if(received<0x44)
+	//	return(0);
 
   return received;
 }

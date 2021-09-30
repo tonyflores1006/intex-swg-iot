@@ -1,4 +1,4 @@
-idf_component_register(SRCS "IntexSWG.cpp" 
+idf_component_register(SRCS "OTAServer.cpp" "IntexSWG.cpp" 
                             "TM1650.cpp" 
                             "utils.cpp" 
                             "RestServer.cpp" 

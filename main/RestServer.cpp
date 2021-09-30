@@ -62,13 +62,13 @@ static esp_err_t general_info_get_handler(httpd_req_t *req) {
     cJSON *data = cJSON_CreateObject();
     
     cJSON *display = cJSON_CreateObject();
-    cJSON_AddStringToObject(display, "status", displayON ? "ON" : "OFF");
+    cJSON_AddStringToObject(display, "status", (!displayON || powerStatus == POWER_STATUS_OFF) ? "OFF" : "ON");    
     cJSON_AddNumberToObject(display, "brightness", displayIntensity);
     cJSON_AddStringToObject(display, "current_code", displayDigits.c_str());
     cJSON_AddItemToObject(data, "display", display);
 
     cJSON *status = cJSON_CreateObject();
-    cJSON_AddStringToObject(status, "power", (powerStatus == POWER_STATUS_BOOTING) ? "BOOTING" : (powerStatus == POWER_STATUS_ON) ? "ON" : "STANDBY");
+    cJSON_AddStringToObject(status, "power", (powerStatus == POWER_STATUS_BOOTING) ? "BOOTING" : (powerStatus == POWER_STATUS_ON) ? "ON" : (powerStatus == POWER_STATUS_STANDBY) ? "STANDBY" : (powerStatus == POWER_STATUS_BUS_ERROR) ? "BUS_ERROR" : "OFF");
     cJSON_AddStringToObject(status, "boost", (statusDigit3 & (0x01 << LED_BOOST)) >> LED_BOOST == 1 ? "ON" : "OFF");
     cJSON_AddStringToObject(status, "sleep", (statusDigit3 & (0x01 << LED_SLEEP)) >> LED_SLEEP == 1 ? "ON" : "OFF");
     cJSON_AddStringToObject(status, "o3_generation", (statusDigit3 & (0x01 << LED_OZONE)) >> LED_OZONE == 1 ? "ON" : "OFF");
@@ -79,7 +79,7 @@ static esp_err_t general_info_get_handler(httpd_req_t *req) {
     cJSON_AddItemToObject(data, "status", status);
 
     cJSON *mode = cJSON_CreateObject();
-    cJSON_AddBoolToObject(mode, "working", powerStatus == 1);
+    cJSON_AddBoolToObject(mode, "working", powerStatus == POWER_STATUS_ON);
     cJSON_AddBoolToObject(mode, "programming", displayBlinking);
     cJSON_AddItemToObject(data, "mode", mode);
 
@@ -91,6 +91,102 @@ static esp_err_t general_info_get_handler(httpd_req_t *req) {
     cJSON_Delete(root);
     return ESP_OK;
 }
+
+// HTTP GET General info request
+static esp_err_t debug_get_handler(httpd_req_t *req) {
+        httpd_resp_set_type(req, "application/json");
+    
+    std::string displayDigits;
+    displayDigits += getDisplayDigitFromCode(displayingDigit2);
+    displayDigits += getDisplayDigitFromCode(displayingDigit1);
+    if (displayingDigit1 == DISP_1_CLEAN_06P || displayingDigit1 == DISP_1_CLEAN_10P || displayingDigit1 == DISP_1_CLEAN_14P) {
+        displayDigits += '.';
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *data = cJSON_CreateObject();
+    
+    char powerStatusChar[10];
+    char statusDigit1Char[10];
+    char statusDigit2Char[10];
+    char statusDigit3Char[10];
+    char displayingDigit1Char[10];
+    char displayingDigit2Char[10];
+    sprintf(powerStatusChar, "0x%02X", powerStatus);
+    sprintf(statusDigit1Char, "0x%02X", statusDigit1);
+    sprintf(statusDigit2Char, "0x%02X", statusDigit2);
+    sprintf(statusDigit3Char, "0x%02X", statusDigit3);
+    sprintf(displayingDigit1Char, "0x%02X", displayingDigit1);
+    sprintf(displayingDigit2Char, "0x%02X", displayingDigit2);
+    
+    std::string powerStatusStr;
+    std::string statusDigit1Str;
+    std::string statusDigit2Str;
+    std::string statusDigit3Str;
+    std::string displayingDigit1Str;
+    std::string displayingDigit2Str;
+    std::string readBufferStr;
+
+    powerStatusStr+=powerStatusChar;
+    statusDigit1Str+=statusDigit1Char;
+    statusDigit2Str+=statusDigit2Char;
+    statusDigit3Str+=statusDigit3Char;
+    displayingDigit1Str+=displayingDigit1Char;
+    displayingDigit2Str+=displayingDigit2Char;
+
+    char buf[4096], *pos = buf;
+    for (int i = 0 ; i != 128 ; i++) {
+        if (i) {
+            pos += sprintf(pos, ", ");
+        }
+        pos += sprintf(pos, "[0X%02X, 0X%02X]", dataReceivedBuffer[i][0], dataReceivedBuffer[i][1]);
+    }
+    readBufferStr+=buf;
+    /*
+    const char* powerStatusStr = powerStatusChar;
+    const char* statusDigit1Str = statusDigit1Char;
+    const char* statusDigit2Str = statusDigit2Char;
+    const char* statusDigit3Str = statusDigit3Char;
+    const char* displayingDigit1Str = displayingDigit1Char;
+    const char* displayingDigit2Str = displayingDigit2Char;
+    */
+    /*
+    std::string powerStatusStr(powerStatusChar);
+    std::string statusDigit1Str(statusDigit1Char);
+    std::string statusDigit2Str(statusDigit2Char);
+    std::string statusDigit3Str(statusDigit3Char);
+    std::string displayingDigit1Str(displayingDigit1Char);
+    std::string displayingDigit2Str(displayingDigit2Char);  
+    */
+
+    cJSON_AddStringToObject(data, "powerStatus", powerStatusStr.c_str());
+    cJSON_AddStringToObject(data, "statusDigit1", statusDigit1Str.c_str());
+    cJSON_AddStringToObject(data, "statusDigit2", statusDigit2Str.c_str());
+    cJSON_AddStringToObject(data, "statusDigit3", statusDigit3Str.c_str());    
+    cJSON_AddStringToObject(data, "displayingDigit1", displayingDigit1Str.c_str());
+    cJSON_AddStringToObject(data, "displayingDigit2", displayingDigit2Str.c_str());
+    cJSON_AddStringToObject(data, "current_code", displayDigits.c_str());
+    cJSON_AddStringToObject(data, "readBuffer", readBufferStr.c_str());
+    
+    cJSON_AddStringToObject(data, "compilation_date", __DATE__);
+    cJSON_AddStringToObject(data, "compilation_time", __TIME__);
+    
+    cJSON_AddBoolToObject(data, "otaUpdating", otaUpdating);
+    cJSON_AddBoolToObject(data, "removeWifiConfig", removeWifiConfig);
+    cJSON_AddBoolToObject(data, "machineON", machineON);
+    cJSON_AddBoolToObject(data, "wifiReconnecting", wifiReconnecting);
+    cJSON_AddBoolToObject(data, "readingMaster", readingMaster);
+    cJSON_AddBoolToObject(data, "sendingKeyCode", sendingKeyCode);
+    
+    cJSON_AddItemToObject(root, "data", data);
+    
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 
 /* Simple handler for power control */
 static esp_err_t general_info_post_handler(httpd_req_t *req)
@@ -118,9 +214,60 @@ static esp_err_t general_info_post_handler(httpd_req_t *req)
     cJSON* cjson_data = cJSON_GetObjectItem(root, "data");
     char* power = cJSON_GetObjectItem(cjson_data, "power")->valuestring;
 
-    keyCodeSetByAPI = true;
-    virtualPressButtonTime = 250;
+    if (strcmp(power, "on") == 0) {        
+        switch (powerStatus) {
+            case POWER_STATUS_OFF:
+                machinePower(true);
+                nextButtonStatus = BUTTON_POWER;
+                responseStatus = true;
+                break;
+            case POWER_STATUS_STANDBY:
+                keyCodeSetByAPI = true;
+                virtualPressButtonTime = 250;
+                buttonStatus = BUTTON_POWER;   
+                responseStatus = true;
+                break;
+            default:
+                responseStatus = false;
+        }        
+    }
+    else if (strcmp(power, "off") == 0) {
+        switch (powerStatus) {
+            case POWER_STATUS_BOOTING:            
+            case POWER_STATUS_ON:
+                keyCodeSetByAPI = true;
+                virtualPressButtonTime = 250;
+                buttonStatus = BUTTON_POWER;
+                delayedPowerOff = true;
+                responseStatus = true;
+                break;
+            case POWER_STATUS_STANDBY:
+                machinePower(false);
+                responseStatus = true;
+                break;
+            default:
+                responseStatus = false;
+        } 
+    }
+    else if (strcmp(power, "standby") == 0) {
+        switch (powerStatus) {
+            case POWER_STATUS_BOOTING:            
+            case POWER_STATUS_ON:
+                keyCodeSetByAPI = true;
+                virtualPressButtonTime = 250;
+                buttonStatus = BUTTON_POWER;
+                responseStatus = true;
+                break;
+            case POWER_STATUS_OFF:
+                machinePower(true);
+                responseStatus = true;
+                break;
+            default:
+                responseStatus = false;
+        } 
+    }  
     
+    /*
     if (strcmp(power, "on") == 0) {        
         if (powerStatus == POWER_STATUS_STANDBY) {
             buttonStatus = BUTTON_POWER;   
@@ -139,7 +286,8 @@ static esp_err_t general_info_post_handler(httpd_req_t *req)
             buttonStatus = BUTTON_POWER;
             responseStatus = true;
         }
-    }            
+    } 
+    */           
 
     cJSON_Delete(root);
 
@@ -277,6 +425,13 @@ static const httpd_uri_t swg_status_get_uri = {
     .uri       = "/api/v1/intex/swg/status",
     .method    = HTTP_GET,
     .handler   = general_info_get_handler,
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t swg_debug_get_uri = {
+    .uri       = "/api/v1/intex/swg/debug",
+    .method    = HTTP_GET,
+    .handler   = debug_get_handler,
     .user_ctx  = NULL
 };
 
@@ -419,9 +574,11 @@ static esp_err_t OTA_update_post_handler(httpd_req_t *req)
 	char ota_buff[1024];
 	int content_length = req->content_len;
 	int content_received = 0;
+    uint8_t percentage = 0;
 	int recv_len;
 	bool is_req_body_started = false;
 	const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    char complete_percent[12];
 
 	// Unsucessful Flashing
 	flash_status = -1;
@@ -440,7 +597,8 @@ static esp_err_t OTA_update_post_handler(httpd_req_t *req)
 			ESP_LOGI("OTA", "OTA Other Error %d", recv_len);
 			return ESP_FAIL;
 		}
-		printf("OTA RX: %d of %d\r", content_received, content_length);
+
+		//printf("OTA RX: %d of %d\r", content_received, content_length);
 		
 	    // Is this the first data we are receiving
 		// If so, it will have the information in the header we need. 
@@ -476,6 +634,10 @@ static esp_err_t OTA_update_post_handler(httpd_req_t *req)
 			esp_ota_write(ota_handle, ota_buff, recv_len);
 			
 			content_received += recv_len;
+            percentage = MIN(content_received * 100 / content_length, 99);
+            std::sprintf(complete_percent, "%d", percentage);
+            statusDigit1 = getCodeFromDisplayDigit((percentage < 10) ? complete_percent[0] : complete_percent[1]);
+            statusDigit2 = getCodeFromDisplayDigit((percentage < 10) ? '0' : complete_percent[0]);
 		}
  
 	} while (recv_len > 0 && content_received < content_length);
@@ -563,7 +725,9 @@ void start_rest_server(unsigned int port) {
     config.server_port = port;
     config.ctrl_port = 32769; 
     config.stack_size = 8192;
-    config.max_uri_handlers = 10;
+    //config.stack_size = 16384;
+    config.max_uri_handlers = 10;    
+    config.lru_purge_enable = true;
 
     // Start the httpd server
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
@@ -571,8 +735,9 @@ void start_rest_server(unsigned int port) {
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &swg_status_get_uri);
+        httpd_register_uri_handler(server, &swg_debug_get_uri);
         httpd_register_uri_handler(server, &swg_status_post_uri);
-        httpd_register_uri_handler(server, &self_clean_post_uri);
+        //httpd_register_uri_handler(server, &self_clean_post_uri);
         httpd_register_uri_handler(server, &display_post_uri);
         httpd_register_uri_handler(server, &wifi_config_delete_uri);
 
@@ -581,9 +746,10 @@ void start_rest_server(unsigned int port) {
 		httpd_register_uri_handler(server, &OTA_jquery_3_4_1_min_js);
 		httpd_register_uri_handler(server, &OTA_update);
 		httpd_register_uri_handler(server, &OTA_status);
+    } 
+    else {
+        ESP_LOGI(TAG, "Error starting server!");
     }
-
-    ESP_LOGI(TAG, "Error starting server!"); 
 }
 
 void stop_webserver() {
