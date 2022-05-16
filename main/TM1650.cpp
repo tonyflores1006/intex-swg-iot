@@ -18,12 +18,12 @@ TM1650::TM1650(gpio_num_t dataPin, gpio_num_t clockPin, uint8_t numDigits, bool 
     digitalWrite(strobePin, HIGH);
     digitalWrite(clockPin, HIGH);
     
-	clearDisplay();
+	//clearDisplay();
 
 	// set the display mode, actual setting of chip is done in setupDisplay() which also sets intensity and on/off state
   _maxSegments=(displaymode==TM1650_DISPMODE_4x8 ? 8 : 7); // default TM1650_DISPMODE_4x8: display mode 4 Grid x 8 Segment
 
-	setupDisplay(activateDisplay, intensity);
+	//setupDisplay(activateDisplay, intensity);
 }
 
 #if defined(__AVR_ATtiny85__) ||  defined(__AVR_ATtiny13__) ||  defined(__AVR_ATtiny44__)
